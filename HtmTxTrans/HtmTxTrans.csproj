@@ -1,0 +1,54 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AngleSharp" Version="1.4.0" />
+    <PackageReference Include="OpenAI" Version="2.10.0" />
+    <PackageReference Include="YamlDotNet" Version="17.0.1" />
+  </ItemGroup>
+
+ <UsingTask TaskName="IncrementVersionTask" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <VersionFile ParameterType="System.String" Required="true" />
+      <NewVersion ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+          string version = "1.0.0.0";
+          if (File.Exists(VersionFile)) {
+              version = File.ReadAllText(VersionFile).Trim();
+          }
+          var parts = version.Split('.');
+          if (parts.Length == 4 && int.TryParse(parts[3], out int build)) {
+              parts[3] = (build + 1).ToString();
+              version = string.Join(".", parts);
+          }
+          // 將新版號寫回實體檔案
+          File.WriteAllText(VersionFile, version);
+          NewVersion = version;
+        ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+  <!-- ========================================== -->
+  <!-- 2. 在編譯打包前，觸發上面的腳本並套用版號 -->
+  <!-- ========================================== -->
+  <Target Name="AutoIncrementVersion" BeforeTargets="GetAssemblyVersion;BeforeBuild">
+    <IncrementVersionTask VersionFile="version.txt">
+      <Output TaskParameter="NewVersion" PropertyName="Version" />
+      <Output TaskParameter="NewVersion" PropertyName="AssemblyVersion" />
+      <Output TaskParameter="NewVersion" PropertyName="FileVersion" />
+    </IncrementVersionTask>
+  </Target>
+
+</Project>
