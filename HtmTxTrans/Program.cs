@@ -363,7 +363,9 @@ static void DisplayHelp()
 {
     var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0.0";
     Console.WriteLine($"""
+    
     HtmTxTrans CLI v{version}
+    Please refer to https://github.com/overdoignism/HtmTxTrans/
     --------------------------------------
     Basic Usage:
 
