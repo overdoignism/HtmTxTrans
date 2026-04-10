@@ -83,7 +83,7 @@ HtmTxTrans -c config6.yaml -p prompt6.yaml -i input.html -w output_dir --p6
 
 ### 5. 極致省錢大法 (Cost-Saving Retries)
 
-既然 Pass 4 與 Pass 5 最容易失敗，您不需要用昂貴的 GPT-4o 跑全程！  
+既然 Pass 4 與 Pass 5 最容易失敗，您不需要用昂貴的雲端模型跑全程！  
 您可以先用便宜的本地模型跑完大批量任務。對於失敗的區塊，系統會自動記錄在 Pass.failure.yaml 中。  
 此時，您只需換上最強的雲端模型設定檔，並下達重試指令：
 

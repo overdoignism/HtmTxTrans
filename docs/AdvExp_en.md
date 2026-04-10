@@ -83,7 +83,7 @@ For hyper-granular alignment, you can set SlidingWindowSize to 10 and Slidi
 
 ### 5. The Frugal Architect (Cost-Saving Retries)
 
-Since Pass 4 & 5 are the most prone to LLM formatting failures, you don't need to run the entire workflow on expensive models like GPT-4o!  
+Since Pass 4 & 5 are the most prone to LLM formatting failures, you don't need to run the entire workflow on expensive cloud models!  
 Run the bulk of your processing on cheap/local models. Any failed chunks will automatically be logged in Pass.failure.yaml.  
 Then, switch to a **powerful cloud config** and run the retry commands:
 
