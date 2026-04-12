@@ -24,7 +24,7 @@ public class LlmService
         {
             Endpoint = new Uri(config.ApiEndpoint),
             NetworkTimeout = timeout,
-            RetryPolicy = new ClientRetryPolicy(maxRetries: 1)
+            RetryPolicy = new ClientRetryPolicy(maxRetries: 0)
         };
 
         if (_config.DisableCachePrompt == 1)

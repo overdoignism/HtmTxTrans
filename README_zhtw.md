@@ -51,6 +51,8 @@ HtmTxTrans 採用了具備高度容錯能力的 6 階段工作管線。每個階
 
 ---
 
-## 5. 快速開始 (Quick Start)
+## 5. 快速開始 (Quick Start) 與跨平台編譯
 
-關於詳細的 CLI 指令用法、進階設定與 Prompt 微調指南，請參閱[進階使用文件](docs/AdvExp_zhtw.md)。
+關於詳細的 CLI 指令用法、進階設定與 Prompt 微調指南，請參閱[**進階使用文件**](docs/AdvExp_zhtw.md)。
+
+[**本指南**](docs/Cross-Platform_Building_Guide.md) 提供 Windows、Linux 和 macOS（Apple Silicon）的編譯命令和環境設定。

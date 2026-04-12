@@ -336,7 +336,7 @@ public class HtmlProcessor
         var cleanChunk = chunk.Select(n => new NodeEntry { Id = n.Id, Text = TextCleaner.RemoveTags(n.Text) }).ToList();
 
         // 這裡也切換為 YAML 格式發送給 LLM 判斷
-        string yamlContent = _yamlSerializer.Serialize(cleanChunk);
+        string yamlContent = _yamlSerializer.SerializeYamlToUtf8(cleanChunk);
 
         string systemPrompt = _llmService!.PrepareSystemPrompt(_promptConfig!.BoundaryDetectionPrompt);
         string response = await _llmService.CallLlmAsync(systemPrompt, yamlContent, "\n[Pass 1] Hard limit reached. Asking LLM for boundary...\n");
@@ -365,7 +365,7 @@ public class HtmlProcessor
     {
         // 寫入 Pass 0 (Node 原型) YAML 檔案
         string nodePath = ProjectFiles.Pass0Chunk(dir, index);
-        await File.WriteAllTextAsync(nodePath, _yamlSerializer.Serialize(chunk));
+        await File.WriteAllTextAsync(nodePath, _yamlSerializer.SerializeYamlToUtf8(chunk));
 
         string currentText = string.Join("<SEP>", chunk.Select(n => TextCleaner.RemoveTags(n.Text)));
         string resolvedSourceText = currentText.Replace("<SEP>", " ");
@@ -386,7 +386,7 @@ public class HtmlProcessor
 
         // 寫入 Pass 1 YAML 檔案
         string pass1Path = ProjectFiles.Pass1Chunk(dir, index);
-        await File.WriteAllTextAsync(pass1Path, _yamlSerializer.Serialize(pass1Data));
+        await File.WriteAllTextAsync(pass1Path, _yamlSerializer.SerializeYamlToUtf8(pass1Data));
     }
 
     private string GetFullOpenTag(IElement el) { var attrs = string.Join("", el.Attributes.Select(a => $" {a.Name}=\"{a.Value}\"")); return $"<{el.LocalName}{attrs}>"; }
@@ -394,7 +394,7 @@ public class HtmlProcessor
     // 共用 YAML 寫入方法
     private void SaveYaml<T>(string path, T data)
     {
-        File.WriteAllText(path, _yamlSerializer.Serialize(data));
+        File.WriteAllText(path, _yamlSerializer.SerializeYamlToUtf8(data));
     }
 
     public static class TextCleaner

@@ -51,6 +51,8 @@ The principal code author and architect for this iteration is **Gemini 3.1 pro*
 
 ---
 
-## 5. Quick Start
+## 5. Quick Start and Cross-Platform Building Guide
 
-For detailed CLI usage, advanced configuration, and prompt engineering instructions, please refer to the [Detailed Documentation](docs/AdvExp_en.md).
+For detailed CLI usage, advanced configuration, and prompt engineering instructions, please refer to the [**Detailed Documentation**](docs/AdvExp_en.md).
+
+[**This guide**](docs/Cross-Platform_Building_Guide.md) provides the compilation commands and environment setup for Windows, Linux, and macOS (Apple Silicon).

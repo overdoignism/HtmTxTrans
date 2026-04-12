@@ -379,6 +379,22 @@ public static class Utitilty
 
         return files;
     }
+    public static string SerializeYamlToUtf8(this YamlDotNet.Serialization.ISerializer serializer, object data)
+    {
+        // 1. 先讓 YamlDotNet 正常序列化 (這時 Emoji 會變成 \U0001F451)
+        string yaml = serializer.Serialize(data);
+
+        // 2. 攔截並還原 8 碼 Unicode (Emojis，例如 \U0001F451)
+        // (?<!\\) 是防呆機制：確保如果原文真的打了字元 '\' + 'U'，我們不會誤殺它
+        yaml = System.Text.RegularExpressions.Regex.Replace(yaml, @"(?<!\\)\\U([0-9A-Fa-f]{8})",
+            m => char.ConvertFromUtf32(Convert.ToInt32(m.Groups[1].Value, 16)));
+
+        // 3. 攔截並還原 4 碼 Unicode (某些中日韓罕見字或符號，例如 \u4E2D)
+        yaml = System.Text.RegularExpressions.Regex.Replace(yaml, @"(?<!\\)\\u([0-9A-Fa-f]{4})",
+            m => char.ConvertFromUtf32(Convert.ToInt32(m.Groups[1].Value, 16)));
+
+        return yaml;
+    }
 }
 
 public static class ContextHelper

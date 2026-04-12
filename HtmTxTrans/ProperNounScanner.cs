@@ -89,7 +89,7 @@ public class ProperNounScanner
             string yamlRef = "{}";
             if (relevantGlossary.Any())
             {
-                yamlRef = _yamlSerializer.Serialize(relevantGlossary).TrimEnd().Replace("\n", "\n  ");
+                yamlRef = _yamlSerializer.SerializeYamlToUtf8(relevantGlossary).TrimEnd().Replace("\n", "\n  ");
             }
 
             string systemPrompt = _llm.PrepareSystemPrompt(_promptConfig.ProperNounPrompt);
@@ -286,7 +286,7 @@ public class ProperNounScanner
             }
         }
 
-        File.WriteAllText(outputPath, _yamlSerializer.Serialize(finalGlossary));
+        File.WriteAllText(outputPath, _yamlSerializer.SerializeYamlToUtf8(finalGlossary));
 
         int actualTermCount = finalGlossary.Count;
 

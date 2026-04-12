@@ -232,7 +232,7 @@ public class TranslationScanner
             if (filteredGlossary.Any())
             {
                 // 序列化為 YAML 並加上縮排，以利鑲嵌至純 YAML Prompt
-                yamlRef = _yamlSerializer.Serialize(filteredGlossary).TrimEnd().Replace("\n", "\n  ");
+                yamlRef = _yamlSerializer.SerializeYamlToUtf8(filteredGlossary).TrimEnd().Replace("\n", "\n  ");
             }
 
             string userPrompt = _promptConfig.TranslationUserPrompt
@@ -258,7 +258,7 @@ public class TranslationScanner
             TranslatedText = translatedTxt
         };
 
-        await File.WriteAllTextAsync(outputPath, _yamlSerializer.Serialize(pass3Result));
+        await File.WriteAllTextAsync(outputPath, _yamlSerializer.SerializeYamlToUtf8(pass3Result));
 
         if (isSuccess && !isEmptyNode)
         {
@@ -335,7 +335,7 @@ public class TranslationScanner
 
                 // 把 Node 裡的標籤清空後再轉換成 YAML 字串，避免直接用 Regex 替換 YAML 字串導致格式損毀
                 var taglessNodes = inputNodes.Select(n => new NodeEntry { Id = n.Id, Text = tagRegex.Replace(n.Text, " ") }).ToList();
-                string currentYamlTagless = _yamlSerializer.Serialize(taglessNodes).TrimEnd().Replace("\n", "\n  ");
+                string currentYamlTagless = _yamlSerializer.SerializeYamlToUtf8(taglessNodes).TrimEnd().Replace("\n", "\n  ");
 
                 string userPrompt4 = _promptConfig.AlignmentUserPrompt
                     .Replace("<<CurrentJson>>", currentYamlTagless) // 注意：模型中變數名若為 <<CurrentJson>> 仍可匹配
@@ -387,7 +387,7 @@ public class TranslationScanner
             }
             else
             {
-                finalYamlToWrite = _yamlSerializer.Serialize(outputNodes4);
+                finalYamlToWrite = _yamlSerializer.SerializeYamlToUtf8(outputNodes4);
             }
         }
 
@@ -458,8 +458,8 @@ public class TranslationScanner
             try
             {
                 // 替換 YAML 到變數裡，加縮排防禦
-                string originalYamlStr = _yamlSerializer.Serialize(inputNodes).TrimEnd().Replace("\n", "\n  ");
-                string nodeAlignedYamlStr = _yamlSerializer.Serialize(pass4Nodes).TrimEnd().Replace("\n", "\n  ");
+                string originalYamlStr = _yamlSerializer.SerializeYamlToUtf8(inputNodes).TrimEnd().Replace("\n", "\n  ");
+                string nodeAlignedYamlStr = _yamlSerializer.SerializeYamlToUtf8(pass4Nodes).TrimEnd().Replace("\n", "\n  ");
 
                 string userPrompt5 = _promptConfig.TagAlignmentUserPrompt
                     .Replace("<<CurrentJson>>", originalYamlStr)
@@ -569,7 +569,7 @@ public class TranslationScanner
             }
             else
             {
-                finalYamlToWrite = _yamlSerializer.Serialize(outputNodes5);
+                finalYamlToWrite = _yamlSerializer.SerializeYamlToUtf8(outputNodes5);
             }
         }
 
@@ -699,7 +699,7 @@ public class TranslationScanner
         {
             record[$"err_{k}"] = failedChunks[k];
         }
-        await File.WriteAllTextAsync(path, _yamlSerializer.Serialize(record));
+        await File.WriteAllTextAsync(path, _yamlSerializer.SerializeYamlToUtf8(record));
     }
 
     private Dictionary<string, string> LoadGlossary(string workingDir)
@@ -804,7 +804,7 @@ public class TranslationScanner
             if (dict != null && dict.ContainsKey("Retry"))
             {
                 dict["Retry"] = 0;
-                string updatedYaml = _yamlSerializer.Serialize(dict);
+                string updatedYaml = _yamlSerializer.SerializeYamlToUtf8(dict);
                 File.WriteAllText(failureFile, updatedYaml);
             }
         }
