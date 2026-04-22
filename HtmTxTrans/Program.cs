@@ -103,11 +103,12 @@ if (hasLogFlag)
 }
 
 // ==========================================
-// 處理帶有選擇性後綴的 --p1 [n|f]
+// 處理帶有選擇性後綴的 --p1 [n|f|p] 與合併策略 --p1t
 // ==========================================
 bool p1 = false;
 bool p1n = false;
 bool p1f = false;
+bool p1p = false;
 
 int p1Idx = Array.IndexOf(args, "--p1");
 if (p1Idx >= 0)
@@ -120,10 +121,36 @@ if (p1Idx >= 0)
         string val = args[p1Idx + 1].ToLower();
         if (val.Contains("n")) p1n = true;
         if (val.Contains("f")) p1f = true;
+        if (val.Contains("p")) p1p = true;
     }
 }
 
-bool p1p = CheckFlag("--p1p");
+// [新增] 處理 --p1t (預設為 1：智慧合併)
+int tagMergeStrategy = 1;
+int p1tIdx = Array.IndexOf(args, "--p1t");
+if (p1tIdx >= 0)
+{
+    handledArgs[p1tIdx] = true;
+    if (p1tIdx + 1 < args.Length && !args[p1tIdx + 1].StartsWith("-"))
+    {
+        handledArgs[p1tIdx + 1] = true;
+        if (int.TryParse(args[p1tIdx + 1], out int parsedT) && parsedT >= 1 && parsedT <= 3)
+        {
+            tagMergeStrategy = parsedT;
+        }
+        else
+        {
+            Console.WriteLine("[Error] Syntax Error: --p1t must be 1, 2, or 3.\n");
+            return 1;
+        }
+    }
+    else
+    {
+        Console.WriteLine("[Error] Syntax Error: --p1t requires a value (1, 2, or 3).\n");
+        return 1;
+    }
+}
+
 
 // ==========================================
 // 處理帶有選擇性數值與後綴的 --p2, --p3, --p4, --p5
@@ -290,7 +317,10 @@ try
     {
         SimpleLogger.LogCustom(Utitilty.PadCenterCustom(" [Pass 1] HTML Extraction & SEP Resolution ", 60, '='));
         Console.WriteLine("");
-        var processor = new HtmlProcessor(config, promptConfig, llmService, !p1n, p1f, p1p);
+
+        // [修改] 直接傳入 tagMergeStrategy
+        var processor = new HtmlProcessor(config, promptConfig, llmService, !p1n, p1f, p1p, tagMergeStrategy);
+
         await processor.ExtractAsync(inputPath, workingDir, config.SlidingWindowSize);
         if (p1) return 0;
     }
@@ -389,11 +419,15 @@ static void DisplayHelp()
 
       Pass 1 (Extract HTML nodes & Resolve SEP):
 
-        --p1 [n|f]  : Run Pass 1 ONLY.
-                      'n' to disable LLM assistance for hard-limit chunk splitting.
-                      'f' to disable LLM <SEP> resolution (use spaces instead).
-                      (Options can be combined, e.g., --p1 nf)
-        --p1p       : Enable translation for <pre> tags.
+        --p1 [n|f|p]  : Run Pass 1 ONLY.
+                        'n' to disable LLM assistance for hard-limit chunk splitting.
+                        'f' to disable LLM <SEP> resolution (use spaces instead).
+                        'p' to enable translation for <pre> tags (same as --p1p).
+                        (Options can be combined, e.g., --p1 nfp)
+        --p1t [1|2|3] : Tag merging strategy for Pass 1 (Default: 1).
+                        1 = Smart merge (breaks on Close->Open reversal like </a><a>).
+                        2 = Force merge all consecutive tags (Legacy).
+                        3 = No merging (Highest LLM freedom, more tags).
 
       Pass 2 (Extract proper nouns & generate glossary):
 

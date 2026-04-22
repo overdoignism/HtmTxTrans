@@ -28,8 +28,10 @@ public class HtmlProcessor
 
     // 建立全域的 YAML 序列化器
     private readonly ISerializer _yamlSerializer;
+    private readonly int _tagMergingStrategy; // [新增] 策略層級變數
 
-    public HtmlProcessor(AppConfig config, LlmPromptConfig? promptConfig = null, LlmService? llmService = null, bool useLlmBoundary = false, bool disableSepResolution = false, bool translatePreTags = false)
+    // [修改] 加入 tagMergingStrategy 參數，預設為 1
+    public HtmlProcessor(AppConfig config, LlmPromptConfig? promptConfig = null, LlmService? llmService = null, bool useLlmBoundary = false, bool disableSepResolution = false, bool translatePreTags = false, int tagMergingStrategy = 1)
     {
         _config = config ?? new AppConfig();
         _translatePreTags = translatePreTags;
@@ -39,6 +41,7 @@ public class HtmlProcessor
         _llmService = llmService;
         _useLlmBoundary = useLlmBoundary;
         _disableSepResolution = disableSepResolution;
+        _tagMergingStrategy = tagMergingStrategy; // [新增]
 
         _yamlSerializer = new SerializerBuilder()
             .ConfigureDefaultValuesHandling(DefaultValuesHandling.OmitNull)
@@ -193,21 +196,79 @@ public class HtmlProcessor
     private class MergeResult { public List<NodeEntry> Nodes { get; set; } = new List<NodeEntry>(); public List<HoldEntry> Holds { get; set; } = new List<HoldEntry>(); }
 
     private MergeResult MergeTags(List<NodeEntry> pre0Nodes, List<HoldEntry> pre0Holds)
-    { /* ... 不變 ... */
+    {
+        // Level 3: 一律不合併 (直接原封不動返回，最保護結構)
+        if (_tagMergingStrategy == 3)
+        {
+            return new MergeResult { Nodes = pre0Nodes, Holds = pre0Holds };
+        }
+
         var holdDict = pre0Holds.ToDictionary(h => h.Placeholder, h => h.Content);
-        var pre1Nodes = new List<NodeEntry>(); var pre1Holds = new List<HoldEntry>(); int newTagCounter = 0;
+        var pre1Nodes = new List<NodeEntry>();
+        var pre1Holds = new List<HoldEntry>();
+        int newTagCounter = 0;
         var consecutiveTagsRegex = new Regex(@"(?:<x_\d+>)+", RegexOptions.Compiled);
         var singleTagRegex = new Regex(@"<x_\d+>", RegexOptions.Compiled);
 
         foreach (var node in pre0Nodes)
         {
             string mergedText = consecutiveTagsRegex.Replace(node.Text, match => {
-                var individualTags = singleTagRegex.Matches(match.Value);
-                var combinedContent = new StringBuilder();
-                foreach (Match m in individualTags) if (holdDict.TryGetValue(m.Value, out string? content)) combinedContent.Append(content);
-                string newPlaceholder = $"<x_{newTagCounter++}>";
-                pre1Holds.Add(new HoldEntry { Placeholder = newPlaceholder, Content = combinedContent.ToString() });
-                return newPlaceholder;
+                var individualTags = singleTagRegex.Matches(match.Value).Cast<Match>().Select(m => m.Value).ToList();
+
+                // Level 2: 一律強制合併 (傳統作法)
+                if (_tagMergingStrategy == 2)
+                {
+                    var combinedContent = new StringBuilder();
+                    foreach (var tag in individualTags)
+                    {
+                        if (holdDict.TryGetValue(tag, out string? content)) combinedContent.Append(content);
+                    }
+                    string newPlaceholder = $"<x_{newTagCounter++}>";
+                    pre1Holds.Add(new HoldEntry { Placeholder = newPlaceholder, Content = combinedContent.ToString() });
+                    return newPlaceholder;
+                }
+                // Level 1: 智慧型合併 (遇到 </close><open> 極性反轉就切斷)
+                else
+                {
+                    var groups = new List<List<string>>();
+                    var currentGroup = new List<string> { individualTags[0] };
+
+                    for (int i = 1; i < individualTags.Count; i++)
+                    {
+                        string prevTag = individualTags[i - 1];
+                        string currTag = individualTags[i];
+
+                        string prevHtml = holdDict.TryGetValue(prevTag, out string? pVal) ? pVal : "";
+                        string currHtml = holdDict.TryGetValue(currTag, out string? cVal) ? cVal : "";
+
+                        bool prevIsClose = prevHtml.StartsWith("</");
+                        bool currIsOpen = !currHtml.StartsWith("</");
+
+                        // [智慧判斷] 極性反轉：從 Close 突然接到 Open，切斷！
+                        if (prevIsClose && currIsOpen)
+                        {
+                            groups.Add(currentGroup);
+                            currentGroup = new List<string>();
+                        }
+
+                        currentGroup.Add(currTag);
+                    }
+                    groups.Add(currentGroup);
+
+                    var replacementText = new StringBuilder();
+                    foreach (var group in groups)
+                    {
+                        var combinedContent = new StringBuilder();
+                        foreach (var tag in group)
+                        {
+                            if (holdDict.TryGetValue(tag, out string? content)) combinedContent.Append(content);
+                        }
+                        string newPlaceholder = $"<x_{newTagCounter++}>";
+                        pre1Holds.Add(new HoldEntry { Placeholder = newPlaceholder, Content = combinedContent.ToString() });
+                        replacementText.Append(newPlaceholder);
+                    }
+                    return replacementText.ToString();
+                }
             });
             pre1Nodes.Add(new NodeEntry { Id = node.Id, Text = mergedText });
         }

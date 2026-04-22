@@ -134,9 +134,11 @@ public class TranslationScanner
         var tagRegex = new Regex(@"<x_\d+>", RegexOptions.Compiled);
         List<int> failedChunks = new List<int>();
 
+        var holdDict = LoadHoldData(ProjectFiles.Hold(workingDir));
+
         for (int i = startIdx; i <= endIdx; i++)
         {
-            bool isSuccess = await ProcessTagAlignChunkAsync(workingDir, i, files.Count, tagRegex, 0);
+            bool isSuccess = await ProcessTagAlignChunkAsync(workingDir, i, files.Count, tagRegex, 0, holdDict);
 
             if (!isSuccess)
             {
@@ -410,7 +412,7 @@ public class TranslationScanner
         return isSuccess;
     }
 
-    private async Task<bool> ProcessTagAlignChunkAsync(string workingDir, int i, int totalFilesCount, Regex tagRegex, int retryCount)
+    private async Task<bool> ProcessTagAlignChunkAsync(string workingDir, int i, int totalFilesCount, Regex tagRegex, int retryCount, Dictionary<string, string> holdDict)
     {
         string nodeFilePath = ProjectFiles.Pass0Chunk(workingDir, i);
         string pass4FilePath = ProjectFiles.Pass4Chunk(workingDir, i);
@@ -524,21 +526,30 @@ public class TranslationScanner
                     }
                     else if (!inTagsRaw.SequenceEqual(outTagsRaw))
                     {
-                        isSuccess = false;
-                        errorMsg = "Tag sequence error (Auto-rearranged)";
-                        logColor = ConsoleColor.Yellow;
-
-                        var textParts = tagRegex.Split(outNode.Text);
-                        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                        for (int t = 0; t < textParts.Length; t++)
+                        // [新增] 先進行結構合法性驗證
+                        if (ValidateTagStructure(inTagsRaw, outTagsRaw, holdDict))
                         {
-                            sb.Append(textParts[t]);
-                            if (t < inTagsRaw.Count)
-                            {
-                                sb.Append(inTagsRaw[t]);
-                            }
+                            // 結構合法，接受 LLM 的調換順序
+                            // (不改變 outNode.Text，也不標記為失敗，默默讓它通過)
                         }
-                        outNode.Text = sb.ToString();
+                        else
+                        {
+                            isSuccess = false;
+                            errorMsg = "Tag sequence error (Auto-rearranged)";
+                            logColor = ConsoleColor.Yellow;
+
+                            var textParts = tagRegex.Split(outNode.Text);
+                            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                            for (int t = 0; t < textParts.Length; t++)
+                            {
+                                sb.Append(textParts[t]);
+                                if (t < inTagsRaw.Count)
+                                {
+                                    sb.Append(inTagsRaw[t]);
+                                }
+                            }
+                            outNode.Text = sb.ToString();
+                        }
                     }
                 }
 
@@ -671,9 +682,13 @@ public class TranslationScanner
 
             List<int> currentFailedChunks = new List<int>(chunksToRetry);
 
+            // [新增] 載入 Hold 字典
+            var holdDict = LoadHoldData(ProjectFiles.Hold(workingDir));
+
             foreach (int i in chunksToRetry)
             {
-                bool isSuccess = await ProcessTagAlignChunkAsync(workingDir, i, totalFilesCount, tagRegex, currentRetry + 1);
+
+                bool isSuccess = await ProcessTagAlignChunkAsync(workingDir, i, totalFilesCount, tagRegex, currentRetry + 1, holdDict);
 
                 if (isSuccess)
                 {
@@ -847,5 +862,82 @@ public class TranslationScanner
 
         SimpleLogger.LogCustom($"[{phaseLogName}] File detected: {Path.GetFileName(filePath)}. Resuming...", ConsoleColor.Green);
         return true;
+    }
+
+    private Dictionary<string, string> LoadHoldData(string holdPath)
+    {
+        if (!File.Exists(holdPath)) return new Dictionary<string, string>();
+        try
+        {
+            var yaml = File.ReadAllText(holdPath);
+            var holds = _yamlDeserializer.Deserialize<List<HoldEntry>>(yaml);
+            return holds?.ToDictionary(h => h.Placeholder, h => h.Content) ?? new Dictionary<string, string>();
+        }
+        catch { return new Dictionary<string, string>(); }
+    }
+
+    private bool ValidateTagStructure(List<string> inTagsRaw, List<string> outTagsRaw, Dictionary<string, string> holdDict)
+    {
+        if (holdDict == null || holdDict.Count == 0) return false;
+
+        // 內部驗證函數：將 <x_n> 陣列展開成 HTML 後進行 Stack 驗證
+        bool IsValidSequence(List<string> sequence)
+        {
+            // 1. 將標籤還原成真實 HTML 組合片段
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            foreach (var tag in sequence)
+            {
+                if (holdDict.TryGetValue(tag, out var content))
+                {
+                    sb.Append(content);
+                }
+            }
+            string fullHtml = sb.ToString();
+
+            // 定義不需要閉合的空元素
+            var voidElements = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "br", "img", "hr", "meta", "input", "link", "area", "base", "col", "param", "source", "track", "wbr"
+            };
+
+            // 抓出字串中所有 HTML 標籤
+            var matches = Regex.Matches(fullHtml, @"<\s*(/?)\s*([a-zA-Z0-9\-]+)[^>]*>");
+            var stack = new Stack<string>();
+
+            foreach (Match m in matches)
+            {
+                // 如果是自閉合標籤 (如 <img />)，直接跳過
+                if (m.Value.EndsWith("/>")) continue;
+
+                bool isClosing = m.Groups[1].Value == "/";
+                string tagName = m.Groups[2].Value.ToLower();
+
+                // [關鍵防禦] 如果是空元素 (如 br, img)，無論開關都完全不參與 Stack 計算
+                if (voidElements.Contains(tagName)) continue;
+
+                if (!isClosing)
+                {
+                    stack.Push(tagName);
+                }
+                else
+                {
+                    // 遇到閉合標籤，但 Stack 已空 (代表提早閉合)
+                    if (stack.Count == 0) return false;
+
+                    string top = stack.Pop();
+                    // 遇到閉合標籤，但不符合最後一個開啟的標籤 (代表交錯，如 <a><b></a></b>)
+                    if (top != tagName) return false;
+                }
+            }
+            // 若最後 Stack 完美清空，代表結構完全合法
+            return stack.Count == 0;
+        }
+
+        // [安全網] 確保我們的驗證邏輯能順利解析原始 HTML
+        // 如果連原始結構驗證都失敗 (極端罕見的未知標籤)，我們就保守地退回 False (拒絕 LLM 調換)
+        if (!IsValidSequence(inTagsRaw)) return false;
+
+        // 正式驗證 LLM 輸出的順序
+        return IsValidSequence(outTagsRaw);
     }
 }
