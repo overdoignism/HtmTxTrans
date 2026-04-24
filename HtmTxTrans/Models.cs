@@ -470,7 +470,7 @@ public static class SimpleLogger
                 catch (Exception ex)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[Logger Error] 無法寫入日誌檔: {ex.Message}");
+                    Console.WriteLine($"[Logger Error] Can't write to log file: {ex.Message}");
                     Console.ResetColor();
                 }
             }
