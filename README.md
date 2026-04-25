@@ -39,7 +39,7 @@ HtmTxTrans processes files through a highly resilient 6-pass workflow. Each pass
   Performs an in-place YAML update, mapping the translated plain text fragments back into their original Node ID structures.
 
 - **Pass 5: Tag Alignment**  
-  Re-inserts the stripped HTML inline tags (e.g., <b>, <a>) back into the translated nodes at their correct semantic positions.
+  Re-inserts the stripped HTML inline tags back into the translated nodes at their correct semantic positions.
 
 - **Pass 6: HTML Restoration**  
   Reconstructs the final HTML file by merging the fully translated and tagged nodes back into the original HTML skeleton.
