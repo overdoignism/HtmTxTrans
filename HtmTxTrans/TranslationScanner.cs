@@ -351,6 +351,9 @@ public class TranslationScanner
 
                 string cleanedYaml4 = CleanLlmYaml(rawResponse4);
 
+                // [新增] 直接用我們的極簡暴力排版器洗掉所有幻覺與縮排問題
+                cleanedYaml4 = ForceFormatYamlList(cleanedYaml4);
+
                 outputNodes4 = _yamlDeserializer.Deserialize<List<NodeEntry>>(cleanedYaml4);
                 if (outputNodes4 == null) throw new Exception("Invalid YAML format.");
 
@@ -473,6 +476,9 @@ public class TranslationScanner
                 string rawResponse5 = await _llm.CallLlmAsync(systemPrompt5, userPrompt5, $"\nStart tag alignment chunk [{phaseLogName}]: {i} of {totalFilesCount - 1}\n");
 
                 string cleanedYaml5 = CleanLlmYaml(rawResponse5);
+
+                // [新增] 呼叫排版器
+                cleanedYaml5 = ForceFormatYamlList(cleanedYaml5);
 
                 hasClosingTagHallucination = Regex.IsMatch(cleanedYaml5, @"<\/\s*x_\d+\s*>");
                 if (hasClosingTagHallucination)
@@ -939,5 +945,50 @@ public class TranslationScanner
 
         // 正式驗證 LLM 輸出的順序
         return IsValidSequence(outTagsRaw);
+    }
+
+    private string ForceFormatYamlList(string rawYaml)
+    {
+        if (string.IsNullOrWhiteSpace(rawYaml)) return rawYaml;
+
+        var lines = rawYaml.Replace("\r", "").Split('\n');
+        var sb = new System.Text.StringBuilder();
+        bool isInside = false;
+
+        foreach (var line in lines)
+        {
+            // 將不換行空白轉為標準空白，並去除首尾多餘空白
+            var t = line.Trim().Replace('\u00A0', ' ');
+
+            if (t.StartsWith("- Id:", StringComparison.OrdinalIgnoreCase))
+            {
+                isInside = true;
+                sb.AppendLine("- Id: " + t.Substring(5).Trim()); // 強制 0 縮排
+            }
+            else if (t.StartsWith("Text:", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.AppendLine("  Text: " + t.Substring(5).Trim()); // 強制 2 空格縮排
+            }
+            else if (isInside && !string.IsNullOrWhiteSpace(t) && !t.EndsWith(":"))
+            {
+                // 保留可能存在的多行文本（如 LLM 折行），給予安全縮排
+                sb.AppendLine("    " + t);
+            }
+        }
+
+        string result = sb.ToString().TrimEnd();
+
+        // 將原始字串統一換行符號並去除首尾空白，用來做嚴格比對
+        string normalizedRaw = rawYaml.Replace("\r", "").TrimEnd();
+
+        // 如果整理後的字串跟原本的不一樣 (代表有修剪過縮排、或移除了 CurrentNodes: 等雜訊)
+        if (normalizedRaw != result)
+        {
+            Console.ForegroundColor = ConsoleColor.DarkYellow;
+            Console.WriteLine("\n(Notice: YAML fixed by Re-formatted)");
+            Console.ResetColor();
+        }
+
+        return result;
     }
 }
