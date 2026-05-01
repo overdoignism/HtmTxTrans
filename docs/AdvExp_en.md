@@ -46,7 +46,7 @@ HtmTxTrans -c config4.yaml -p prompt4.yaml -i input.html -w output_dir --p4
 HtmTxTrans -c config4retry.yaml -p prompt4retry.yaml -i input.html -w output_dir --p4r  
 HtmTxTrans -c config5.yaml -p prompt5.yaml -i input.html -w output_dir --p5  
 HtmTxTrans -c config5retry.yaml -p prompt5retry.yaml -i input.html -w output_dir --p5r  
-HtmTxTrans -c config6.yaml -p prompt6.yaml -i input.html -w output_dir --p6
+HtmTxTrans -c config6.yaml -i input.html -w output_dir --p6
 
 By doing this, you can assign **different LLM models and custom Prompts** for each pass, optimizing for both cost and quality.
 

@@ -46,7 +46,7 @@ HtmTxTrans -c config4.yaml -p prompt4.yaml -i input.html -w output_dir --p4
 HtmTxTrans -c config4retry.yaml -p prompt4retry.yaml -i input.html -w output_dir --p4r  
 HtmTxTrans -c config5.yaml -p prompt5.yaml -i input.html -w output_dir --p5  
 HtmTxTrans -c config5retry.yaml -p prompt5retry.yaml -i input.html -w output_dir --p5r  
-HtmTxTrans -c config6.yaml -p prompt6.yaml -i input.html -w output_dir --p6
+HtmTxTrans -c config6.yaml -i input.html -w output_dir --p6
 
 透過這種方式，您可以為每一個 Pass **分別指派不同的 LLM 模型與自訂 Prompt**，達到成本與品質的最佳平衡。
 
